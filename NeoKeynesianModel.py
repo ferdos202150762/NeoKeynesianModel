@@ -1,6 +1,7 @@
 import numpy as np
 import pandas as pd
 import streamlit as st
+import altair as alt
 
 with st.sidebar:
     st.title("Model Parameters")
@@ -77,7 +78,7 @@ Psi = np.array([
     [0, 0, 0, 0],
     [0, 0, 0, 0],
     [0, 0, 1, 0],
-    [0, 0, 0, 0],
+    [0, 0, 1, 0],
     [0, 1, 0, 0],
     [1, 0, 0, 0],
     [0, 0, 0, 0],
@@ -85,8 +86,8 @@ Psi = np.array([
 ])
 
 Pi = np.array([
-    [1, 0],
-    [1, 0],
+    [-1, -1/tau],
+    [0, -beta],
     [0, 0],
     [0, 0],
     [0, 0],
@@ -110,9 +111,11 @@ for t in range(1, T):
     rand_z = np.random.normal(0, .01, 1).item()   
     rand_g = np.random.normal(0, .01, 1).item() 
     rand_R = np.random.normal(0, .01, 1).item() 
+    rand_output = np.random.normal(0, .01, 1).item() 
+    rand_inflation = np.random.normal(0, .01, 1).item()
 
     epsilon_t = np.array([rand_z, rand_g, rand_R, 0])  # Example structural shock vector
-    eta_t = np.array([0, 0])  # Example expectational errors vector
+    eta_t = np.array([rand_output, rand_inflation])  # Example expectational errors vector
     # Calculate the next state
     s_t = np.linalg.solve(Gamma_0, Gamma_1 @ state_history[t-1, :] + Psi @ epsilon_t + Pi @ eta_t)
     state_history[t, :] = s_t
@@ -126,5 +129,46 @@ df = pd.DataFrame(state_history, columns=columns, index=index)
 # Print the DataFrame
 st.title("NeoKyenesian Model")
 st.title("")
-print(df)
-st.line_chart(df, width = 1800,height=600)
+
+# Prepare data for Altair (melt to long format)
+df_long = df.reset_index().melt(id_vars='index', 
+                                value_vars=["% Deviation from SS output", 
+                                            "% Deviation from SS inflation", 
+                                            "% Deviation from SS interest rate", 
+                                            "Monetary policy shock"],
+                                var_name='Series', value_name='Value')
+
+# Create the Altair chart
+chart = alt.Chart(df_long).mark_line().encode(
+    x='index:O',  # Use the index (periods) as X-axis
+    y='Value:Q',  # Quantitative Y-axis
+    color='Series:N'  # Differentiate lines by series
+).properties(
+    width=1000,
+    height=600
+).configure_legend(
+    orient='right'  # Position legend on the right-hand side
+)
+
+# Display the Altair chart in Streamlit
+st.altair_chart(chart, use_container_width=True)
+
+# Prepare data for Altair (melt to long format)
+df_long2 = df.reset_index().melt(id_vars='index', 
+                                value_vars=[ "% Deviation from SS output growth rate", "% Deviation from SS technology rate", " Expected deviation from SS output", " Expected deviation from SS inflation"],
+                                var_name='Series', value_name='Value')
+
+# Create the Altair chart
+chart = alt.Chart(df_long2).mark_line().encode(
+    x='index:O',  # Use the index (periods) as X-axis
+    y='Value:Q',  # Quantitative Y-axis
+    color='Series:N'  # Differentiate lines by series
+).properties(
+    width=1000,
+    height=600
+).configure_legend(
+    orient='right'  # Position legend on the right-hand side
+)
+
+# Display the Altair chart in Streamlit
+st.altair_chart(chart, use_container_width=True)
